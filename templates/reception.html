@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Réception – Assistant Hôtel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; background:#f4f6f8; margin:0; }
+        header { background:#0b1f3a; color:#fff; padding:15px 20px; }
+        h1 { margin:0; font-size:20px; }
+        .container { padding:20px; }
+        .stats { margin-bottom:10px; font-weight:bold; }
+        table { width:100%; border-collapse: collapse; background:#fff; }
+        th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; }
+        th { background:#eef2f6; }
+        .badge { padding:4px 8px; border-radius:12px; font-size:12px; }
+        .open { background:#ffcc33; }
+        .done { background:#9ad29a; }
+        button { padding:6px 10px; cursor:pointer; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>📥 Réception – Demandes Clients</h1>
+</header>
+
+<div class="container">
+    <div class="stats">
+        Demandes en attente : <span id="count">0</span>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Chambre</th>
+                <th>Message</th>
+                <th>Heure</th>
+                <th>Statut</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+    </table>
+</div>
+
+<script>
+async function loadRequests(){
+    const res = await fetch("/api/list");
+    const data = await res.json();
+
+    const rows = document.getElementById("rows");
+    const count = document.getElementById("count");
+    rows.innerHTML = "";
+
+    let pending = 0;
+
+    data.forEach((r, i) => {
+        if(!r.done) pending++;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${r.room}</td>
+            <td>${r.text}</td>
+            <td>${r.time}</td>
+            <td>
+                <span class="badge ${r.done ? 'done' : 'open'}">
+                    ${r.done ? 'Traité' : 'En attente'}
+                </span>
+            </td>
+            <td>
+                ${r.done ? '' : `<button onclick="markDone(${i})">Marquer comme traité</button>`}
+            </td>
+        `;
+        rows.appendChild(tr);
+    });
+
+    count.innerText = pending;
+}
+
+async function markDone(index){
+    await fetch("/api/done/" + index, { method:"POST" });
+    loadRequests();
+}
+
+setInterval(loadRequests, 2000);
+loadRequests();
+</script>
+
+</body>
+</html>
