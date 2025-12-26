@@ -57,44 +57,84 @@ textarea, input {
 <div class="container">
     <h1>🎤 Parlez à la réception</h1>
 
+    <!-- BOUTON VOCAL PRINCIPAL -->
     <button onclick="startVoice()">🎙️ APPUYER POUR PARLER</button>
 
+    <!-- TEXTE OPTIONNEL -->
     <textarea id="text" rows="3" placeholder="Ou écrivez votre demande (optionnel)"></textarea>
     <input id="room" placeholder="Numéro de chambre (ex: 203)" />
 
     <button onclick="sendText()">📨 Envoyer</button>
 
-    <p class="small">Votre demande est transmise immédiatement</p>
+    <p class="small">Votre demande est transmise immédiatement à la réception</p>
 </div>
 
 <script>
+let recognition;
+let stopTimer;
+
+// ==========================
+// SYNTHÈSE VOCALE (RETOUR)
+// ==========================
+function speakConfirmation() {
+    if (!('speechSynthesis' in window)) return;
+
+    const message = new SpeechSynthesisUtterance(
+        "Votre demande a bien été transmise à la réception."
+    );
+    message.lang = "fr-FR";
+    message.rate = 1;
+    message.pitch = 1;
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(message);
+}
+
+// ==========================
+// RECONNAISSANCE VOCALE
+// ==========================
 function startVoice() {
     if (!('webkitSpeechRecognition' in window)) {
-        alert("Reconnaissance vocale non supportée");
+        alert("Reconnaissance vocale non supportée sur ce navigateur");
         return;
     }
 
-    const recognition = new webkitSpeechRecognition();
+    recognition = new webkitSpeechRecognition();
     recognition.lang = "fr-FR";
+    recognition.continuous = false;
     recognition.interimResults = false;
 
-    recognition.onresult = function(event) {
+    recognition.onstart = () => {
+        // Sécurité : arrêt automatique après 6 secondes
+        stopTimer = setTimeout(() => {
+            recognition.stop();
+        }, 6000);
+    };
+
+    recognition.onresult = (event) => {
+        clearTimeout(stopTimer);
         const text = event.results[0][0].transcript;
         document.getElementById("text").value = text;
+        recognition.stop();
         sendText();
+    };
+
+    recognition.onerror = () => {
+        clearTimeout(stopTimer);
+        recognition.stop();
     };
 
     recognition.start();
 }
 
+// ==========================
+// ENVOI TEXTE AU SERVEUR
+// ==========================
 async function sendText() {
     const text = document.getElementById("text").value;
     const room = document.getElementById("room").value || "Inconnue";
 
-    if (!text) {
-        alert("Parlez ou écrivez un message");
-        return;
-    }
+    if (!text) return;
 
     await fetch("/api/send", {
         method: "POST",
@@ -106,7 +146,7 @@ async function sendText() {
         })
     });
 
-    alert("✅ Demande envoyée");
+    speakConfirmation();
     document.getElementById("text").value = "";
 }
 </script>
