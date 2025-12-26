@@ -10,12 +10,23 @@
         h1 { margin:0; font-size:20px; }
         .container { padding:20px; }
         .stats { margin-bottom:10px; font-weight:bold; }
+
         table { width:100%; border-collapse: collapse; background:#fff; }
         th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; }
         th { background:#eef2f6; }
-        .badge { padding:4px 8px; border-radius:12px; font-size:12px; }
-        .open { background:#ffcc33; }
-        .done { background:#9ad29a; }
+
+        .badge {
+            padding:4px 10px;
+            border-radius:14px;
+            font-size:12px;
+            font-weight:bold;
+            color:#000;
+        }
+
+        .URGENT { background:#ff4d4f; color:#fff; }
+        .MOYEN { background:#faad14; }
+        .FAIBLE { background:#52c41a; color:#fff; }
+
         button { padding:6px 10px; cursor:pointer; }
     </style>
 </head>
@@ -35,8 +46,8 @@
             <tr>
                 <th>Chambre</th>
                 <th>Message</th>
+                <th>Priorité</th>
                 <th>Heure</th>
-                <th>Statut</th>
                 <th>Action</th>
             </tr>
         </thead>
@@ -47,7 +58,11 @@
 <script>
 async function loadRequests(){
     const res = await fetch("/api/list");
-    const data = await res.json();
+    let data = await res.json();
+
+    // 🔥 TRI : URGENT > MOYEN > FAIBLE
+    const order = { "URGENT": 1, "MOYEN": 2, "FAIBLE": 3 };
+    data.sort((a, b) => order[a.priority] - order[b.priority]);
 
     const rows = document.getElementById("rows");
     const count = document.getElementById("count");
@@ -62,14 +77,14 @@ async function loadRequests(){
         tr.innerHTML = `
             <td>${r.room}</td>
             <td>${r.text}</td>
-            <td>${r.time}</td>
             <td>
-                <span class="badge ${r.done ? 'done' : 'open'}">
-                    ${r.done ? 'Traité' : 'En attente'}
+                <span class="badge ${r.priority}">
+                    ${r.priority}
                 </span>
             </td>
+            <td>${r.time}</td>
             <td>
-                ${r.done ? '' : `<button onclick="markDone(${i})">Marquer comme traité</button>`}
+                ${r.done ? "✔️" : `<button onclick="markDone(${i})">Traiter</button>`}
             </td>
         `;
         rows.appendChild(tr);
