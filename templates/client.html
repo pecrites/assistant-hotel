@@ -19,36 +19,47 @@ body {
 .container {
     text-align: center;
     width: 90%;
-    max-width: 400px;
+    max-width: 420px;
 }
 h1 {
-    margin-bottom: 30px;
+    margin-bottom: 25px;
 }
 button {
     width: 100%;
-    padding: 25px;
-    font-size: 22px;
+    padding: 22px;
+    font-size: 20px;
     border-radius: 50px;
     border: none;
+    cursor: pointer;
+    margin-bottom: 15px;
+}
+.btn-voice {
     background: #ffcc33;
     color: #000;
-    cursor: pointer;
-    margin-bottom: 20px;
+}
+.btn-send {
+    background: #4caf50;
+    color: white;
+}
+.btn-confirm {
+    background: #2196f3;
+    color: white;
+    display: none;
 }
 button:active {
-    background: #ffb300;
+    opacity: 0.85;
 }
 textarea, input {
     width: 100%;
     padding: 12px;
     margin-top: 10px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: none;
-    font-size: 16px;
+    font-size: 15px;
 }
 .small {
     font-size: 12px;
-    opacity: 0.85;
+    opacity: 0.8;
     margin-top: 10px;
 }
 </style>
@@ -59,16 +70,20 @@ textarea, input {
 <div class="container">
     <h1>🎤 Parlez à la réception</h1>
 
-    <!-- BOUTON VOCAL PRINCIPAL -->
-    <button onclick="startVoice()">🎙️ APPUYER POUR PARLER</button>
+    <!-- BOUTON VOCAL -->
+    <button class="btn-voice" onclick="startVoice()">🎙️ APPUYER POUR PARLER</button>
 
-    <!-- TEXTE (OPTIONNEL) -->
-    <textarea id="text" rows="3" placeholder="Ou écrivez votre demande (optionnel)"></textarea>
+    <!-- TEXTE OPTIONNEL -->
+    <textarea id="text" rows="3" placeholder="Votre demande apparaîtra ici"></textarea>
+    <input id="room" placeholder="Numéro de chambre (ex : 203)">
 
-    <!-- CHAMBRE (OBLIGATOIRE) -->
-    <input id="room" placeholder="Numéro de chambre (ex : 203)" />
+    <!-- ENVOI -->
+    <button class="btn-send" onclick="sendText()">📨 Envoyer la demande</button>
 
-    <button onclick="sendText()">📨 Envoyer</button>
+    <!-- CONFIRMATION VOCALE (FIABLE) -->
+    <button id="confirmBtn" class="btn-confirm" onclick="playConfirmation()">
+        🔊 Écouter la confirmation
+    </button>
 
     <p class="small">
         Votre demande est transmise immédiatement à la réception
@@ -77,31 +92,14 @@ textarea, input {
 
 <script>
 let recognition;
-let stopTimer;
+let confirmationMessage = "";
 
 // ==========================
-// 🔊 RETOUR VOCAL (CONFIRMATION)
-// ==========================
-function speakConfirmation() {
-    if (!("speechSynthesis" in window)) return;
-
-    const message = new SpeechSynthesisUtterance(
-        "Votre demande a bien été transmise à la réception."
-    );
-    message.lang = "fr-FR";
-    message.rate = 1;
-    message.pitch = 1;
-
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(message);
-}
-
-// ==========================
-// 🎤 RECONNAISSANCE VOCALE
+// DÉMARRER LA VOIX (CLIENT)
 // ==========================
 function startVoice() {
-    if (!("webkitSpeechRecognition" in window)) {
-        alert("La reconnaissance vocale n’est pas supportée sur ce navigateur.");
+    if (!('webkitSpeechRecognition' in window)) {
+        alert("La reconnaissance vocale n'est pas supportée sur ce navigateur");
         return;
     }
 
@@ -110,58 +108,37 @@ function startVoice() {
     recognition.continuous = false;
     recognition.interimResults = false;
 
-    recognition.onstart = () => {
-        // Sécurité : arrêt automatique après 6 secondes
-        stopTimer = setTimeout(() => {
-            recognition.stop();
-        }, 6000);
-    };
+    // Sécurité : arrêt auto après 6 secondes
+    const stopTimer = setTimeout(() => recognition.stop(), 6000);
 
     recognition.onresult = (event) => {
         clearTimeout(stopTimer);
         const text = event.results[0][0].transcript;
         document.getElementById("text").value = text;
         recognition.stop();
-
-        // ⚠️ IMPORTANT : retour vocal AVANT le fetch
-        speakConfirmation();
-        sendText(true);
     };
 
     recognition.onerror = () => {
         clearTimeout(stopTimer);
         recognition.stop();
-        alert("Erreur de reconnaissance vocale. Réessayez.");
     };
 
     recognition.start();
 }
 
 // ==========================
-// 📤 ENVOI AU SERVEUR
+// ENVOI AU SERVEUR
 // ==========================
-async function sendText(fromVoice = false) {
+async function sendText() {
     const text = document.getElementById("text").value.trim();
-    const room = document.getElementById("room").value.trim();
+    const room = document.getElementById("room").value || "Inconnue";
 
-    // 🚫 Chambre obligatoire
-    if (!room) {
-        alert("Veuillez entrer votre numéro de chambre.");
-        return;
-    }
-
-    // 🚫 Texte obligatoire
     if (!text) {
-        alert("Parlez ou écrivez votre demande.");
+        alert("Veuillez parler ou écrire votre demande");
         return;
     }
 
-    // 🔊 Si envoi manuel (clic), on parle ici
-    if (!fromVoice) {
-        speakConfirmation();
-    }
-
-    await fetch("/api/send", {
+    const response = await fetch("/api/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -171,7 +148,29 @@ async function sendText(fromVoice = false) {
         })
     });
 
+    const data = await response.json();
+
+    confirmationMessage = "Votre demande a bien été transmise à la réception.";
+    document.getElementById("confirmBtn").style.display = "block";
     document.getElementById("text").value = "";
+}
+
+// ==========================
+// CONFIRMATION VOCALE (100% FIABLE)
+// ==========================
+function playConfirmation() {
+    if (!('speechSynthesis' in window)) {
+        alert("Synthèse vocale non supportée");
+        return;
+    }
+
+    const msg = new SpeechSynthesisUtterance(confirmationMessage);
+    msg.lang = "fr-FR";
+    msg.rate = 1;
+    msg.pitch = 1;
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(msg);
 }
 </script>
 
