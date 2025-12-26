@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Assistant Hôtel – Client</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #0b1f3a;
+    color: white;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+.container {
+    text-align: center;
+    width: 90%;
+    max-width: 400px;
+}
+h1 {
+    margin-bottom: 30px;
+}
+button {
+    width: 100%;
+    padding: 25px;
+    font-size: 20px;
+    border-radius: 50px;
+    border: none;
+    background: #ffcc33;
+    color: #000;
+    cursor: pointer;
+    margin-bottom: 20px;
+}
+button:active {
+    background: #ffb300;
+}
+textarea, input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 8px;
+    border: none;
+}
+.small {
+    font-size: 12px;
+    opacity: 0.8;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>🎤 Parlez à la réception</h1>
+
+    <!-- BOUTON VOCAL PRINCIPAL -->
+    <button onclick="startVoice()">🎙️ APPUYER POUR PARLER</button>
+
+    <!-- TEXTE (SECONDAIRE) -->
+    <textarea id="text" rows="3" placeholder="Ou écrivez votre demande (optionnel)"></textarea>
+
+    <input id="room" placeholder="Numéro de chambre (ex: 203)" />
+
+    <button onclick="sendText()">📨 Envoyer</button>
+
+    <p class="small">Votre demande sera transmise immédiatement à la réception</p>
+</div>
+
+<script>
+let recognition;
+
+function startVoice() {
+    if (!('webkitSpeechRecognition' in window)) {
+        alert("Reconnaissance vocale non supportée sur ce navigateur");
+        return;
+    }
+
+    recognition = new webkitSpeechRecognition();
+    recognition.lang = "fr-FR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = function(event) {
+        const text = event.results[0][0].transcript;
+        document.getElementById("text").value = text;
+        sendText();
+    };
+
+    recognition.onerror = function() {
+        alert("Erreur de reconnaissance vocale");
+    };
+
+    recognition.start();
+}
+
+async function sendText() {
+    const text = document.getElementById("text").value;
+    const room = document.getElementById("room").value || "Inconnue";
+
+    if (!text) {
+        alert("Veuillez parler ou écrire un message");
+        return;
+    }
+
+    await fetch("/api/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            room: room,
+            text: text,
+            lang: "fr"
+        })
+    });
+
+    alert("✅ Demande envoyée à la réception");
+    document.getElementById("text").value = "";
+}
+</script>
+
+</body>
+</html>

@@ -40,14 +40,16 @@ button:active {
 }
 textarea, input {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     margin-top: 10px;
     border-radius: 8px;
     border: none;
+    font-size: 16px;
 }
 .small {
     font-size: 12px;
-    opacity: 0.8;
+    opacity: 0.85;
+    margin-top: 10px;
 }
 </style>
 </head>
@@ -60,13 +62,17 @@ textarea, input {
     <!-- BOUTON VOCAL PRINCIPAL -->
     <button onclick="startVoice()">🎙️ APPUYER POUR PARLER</button>
 
-    <!-- TEXTE OPTIONNEL -->
+    <!-- TEXTE (OPTIONNEL) -->
     <textarea id="text" rows="3" placeholder="Ou écrivez votre demande (optionnel)"></textarea>
-    <input id="room" placeholder="Numéro de chambre (ex: 203)" />
+
+    <!-- CHAMBRE (OBLIGATOIRE) -->
+    <input id="room" placeholder="Numéro de chambre (ex : 203)" />
 
     <button onclick="sendText()">📨 Envoyer</button>
 
-    <p class="small">Votre demande est transmise immédiatement à la réception</p>
+    <p class="small">
+        Votre demande est transmise immédiatement à la réception
+    </p>
 </div>
 
 <script>
@@ -74,10 +80,10 @@ let recognition;
 let stopTimer;
 
 // ==========================
-// SYNTHÈSE VOCALE (RETOUR)
+// 🔊 RETOUR VOCAL (CONFIRMATION)
 // ==========================
 function speakConfirmation() {
-    if (!('speechSynthesis' in window)) return;
+    if (!("speechSynthesis" in window)) return;
 
     const message = new SpeechSynthesisUtterance(
         "Votre demande a bien été transmise à la réception."
@@ -91,11 +97,11 @@ function speakConfirmation() {
 }
 
 // ==========================
-// RECONNAISSANCE VOCALE
+// 🎤 RECONNAISSANCE VOCALE
 // ==========================
 function startVoice() {
-    if (!('webkitSpeechRecognition' in window)) {
-        alert("Reconnaissance vocale non supportée sur ce navigateur");
+    if (!("webkitSpeechRecognition" in window)) {
+        alert("La reconnaissance vocale n’est pas supportée sur ce navigateur.");
         return;
     }
 
@@ -116,25 +122,44 @@ function startVoice() {
         const text = event.results[0][0].transcript;
         document.getElementById("text").value = text;
         recognition.stop();
-        sendText();
+
+        // ⚠️ IMPORTANT : retour vocal AVANT le fetch
+        speakConfirmation();
+        sendText(true);
     };
 
     recognition.onerror = () => {
         clearTimeout(stopTimer);
         recognition.stop();
+        alert("Erreur de reconnaissance vocale. Réessayez.");
     };
 
     recognition.start();
 }
 
 // ==========================
-// ENVOI TEXTE AU SERVEUR
+// 📤 ENVOI AU SERVEUR
 // ==========================
-async function sendText() {
-    const text = document.getElementById("text").value;
-    const room = document.getElementById("room").value || "Inconnue";
+async function sendText(fromVoice = false) {
+    const text = document.getElementById("text").value.trim();
+    const room = document.getElementById("room").value.trim();
 
-    if (!text) return;
+    // 🚫 Chambre obligatoire
+    if (!room) {
+        alert("Veuillez entrer votre numéro de chambre.");
+        return;
+    }
+
+    // 🚫 Texte obligatoire
+    if (!text) {
+        alert("Parlez ou écrivez votre demande.");
+        return;
+    }
+
+    // 🔊 Si envoi manuel (clic), on parle ici
+    if (!fromVoice) {
+        speakConfirmation();
+    }
 
     await fetch("/api/send", {
         method: "POST",
@@ -146,7 +171,6 @@ async function sendText() {
         })
     });
 
-    speakConfirmation();
     document.getElementById("text").value = "";
 }
 </script>
