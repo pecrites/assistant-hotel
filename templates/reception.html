@@ -1,68 +1,92 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <title>Réception – Assistant Hôtel</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: Arial, sans-serif; background:#f4f6f8; margin:0; }
-        header { background:#0b1f3a; color:#fff; padding:15px 20px; }
-        h1 { margin:0; font-size:20px; }
-        .container { padding:20px; }
-        .stats { margin-bottom:10px; font-weight:bold; }
+<meta charset="UTF-8">
+<title>Réception – Assistant Hôtel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        table { width:100%; border-collapse: collapse; background:#fff; }
-        th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; }
-        th { background:#eef2f6; }
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+}
+header {
+    background: #0b1f3a;
+    color: white;
+    padding: 15px 20px;
+}
+.container {
+    padding: 20px;
+}
+table {
+    width: 100%;
+    background: white;
+    border-collapse: collapse;
+}
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+th {
+    background: #eef2f6;
+}
+button {
+    padding: 6px 10px;
+    cursor: pointer;
+}
 
-        .badge {
-            padding:4px 10px;
-            border-radius:14px;
-            font-size:12px;
-            font-weight:bold;
-            color:#000;
-        }
-
-        .URGENT { background:#ff4d4f; color:#fff; }
-        .MOYEN { background:#faad14; }
-        .FAIBLE { background:#52c41a; color:#fff; }
-
-        button { padding:6px 10px; cursor:pointer; }
-    </style>
+/* PRIORITÉS */
+.badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 12px;
+    color: white;
+}
+.urgent { background: #e53935; }
+.moyen { background: #f9a825; }
+.faible { background: #43a047; }
+</style>
 </head>
+
 <body>
 
 <header>
-    <h1>📥 Réception – Demandes Clients</h1>
+<h2>📥 Réception – Demandes Clients</h2>
 </header>
 
 <div class="container">
-    <div class="stats">
-        Demandes en attente : <span id="count">0</span>
-    </div>
+<p><strong>Demandes en attente :</strong> <span id="count">0</span></p>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Chambre</th>
-                <th>Message</th>
-                <th>Priorité</th>
-                <th>Heure</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-    </table>
+<table>
+<thead>
+<tr>
+<th>Chambre</th>
+<th>Message</th>
+<th>Priorité</th>
+<th>Heure</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="rows"></tbody>
+</table>
 </div>
 
 <script>
-async function loadRequests(){
+const PRIORITY_ORDER = { "URGENT": 1, "MOYEN": 2, "FAIBLE": 3 };
+
+async function loadRequests() {
     const res = await fetch("/api/list");
     let data = await res.json();
 
-    // 🔥 TRI : URGENT > MOYEN > FAIBLE
-    const order = { "URGENT": 1, "MOYEN": 2, "FAIBLE": 3 };
-    data.sort((a, b) => order[a.priority] - order[b.priority]);
+    // Sécurité : jamais undefined
+    data.forEach(r => {
+        if (!r.priority) r.priority = "FAIBLE";
+    });
+
+    // TRI PAR PRIORITÉ
+    data.sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
 
     const rows = document.getElementById("rows");
     const count = document.getElementById("count");
@@ -71,21 +95,19 @@ async function loadRequests(){
     let pending = 0;
 
     data.forEach((r, i) => {
-        if(!r.done) pending++;
+        if (!r.done) pending++;
+
+        let cls = "faible";
+        if (r.priority === "URGENT") cls = "urgent";
+        if (r.priority === "MOYEN") cls = "moyen";
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${r.room}</td>
             <td>${r.text}</td>
-            <td>
-                <span class="badge ${r.priority}">
-                    ${r.priority}
-                </span>
-            </td>
+            <td><span class="badge ${cls}">${r.priority}</span></td>
             <td>${r.time}</td>
-            <td>
-                ${r.done ? "✔️" : `<button onclick="markDone(${i})">Traiter</button>`}
-            </td>
+            <td>${r.done ? "✔" : `<button onclick="markDone(${i})">Traiter</button>`}</td>
         `;
         rows.appendChild(tr);
     });
@@ -93,8 +115,8 @@ async function loadRequests(){
     count.innerText = pending;
 }
 
-async function markDone(index){
-    await fetch("/api/done/" + index, { method:"POST" });
+async function markDone(index) {
+    await fetch("/api/done/" + index, { method: "POST" });
     loadRequests();
 }
 
